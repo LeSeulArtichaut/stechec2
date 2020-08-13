@@ -2,7 +2,7 @@ from jinja2 import contextfilter
 
 from . import register_filter
 from .common import (
-    camel_case, get_array_inner, is_array, is_returning, is_tuple,
+    camel_case, can_fail, get_array_inner, is_array, is_returning, is_tuple,
 )
 from .cxx import cxx_comment
 
@@ -45,7 +45,11 @@ def rust_prototype(ctx, func, ffi=False) -> str:
     get_type = rust_ffi_type if ffi else rust_api_output_type
 
     if is_returning(func):
-        ret_annotation = ' -> ' + get_type(ctx, func['fct_ret_type'])
+        ret_annotation = ' -> '
+        if ffi or not can_fail(func):
+            ret_annotation +=  get_type(ctx, func['fct_ret_type'])
+        else: # fancy type wrapper
+            ret_annotation += 'Option<' + get_type(ctx, func['fct_ret_type']) + '>'
     else:
         ret_annotation = ''
 

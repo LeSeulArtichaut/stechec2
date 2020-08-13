@@ -1,5 +1,6 @@
 import textwrap
 from functools import partial
+from jinja2 import contextfilter
 
 from . import register_filter, register_test
 
@@ -56,3 +57,30 @@ def generic_comment(value: str, start: str, indent: int = 0) -> str:
         break_long_words=False,
         replace_whitespace=False
     ))
+
+@register_filter
+def can_fail(func) -> bool:
+    return func.get('fct_can_fail', False)
+
+@register_test
+@contextfilter
+def is_numeric(ctx, value) -> bool:
+    """
+    Returns whether a type contains only numbers, that is, it is itself a number
+    or all its fields 'are numeric' recursively
+    """
+
+    if value in ['int', 'double']:
+        return True
+
+    as_struct = ctx['game'].get_struct(value)
+    if as_struct:
+        return all(is_numeric(ctx, field_type) for _, field_type, _ in as_struct['str_field'])
+
+    return False
+
+
+@register_filter
+@contextfilter
+def numeric_fields(ctx, struct):
+    return [(f_name, f_type, f_doc) for f_name, f_type, f_doc in struct['str_field'] if is_numeric(ctx, f_type)]

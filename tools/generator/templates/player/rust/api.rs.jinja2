@@ -41,6 +41,42 @@ pub struct {{ struct.str_name|camel_case }} {
 }
 
 {% endfor %}
+
+// ADT Wrapper trait
+pub trait ToADT<T> {
+    fn to_adt(self) -> Option<T>;
+}
+
+{% for type in ['double', 'int'] %}
+{% with api_type=type|rust_api_output_type %}
+impl ToADT<{{ api_type }}> for {{ api_type }} {
+     fn to_adt(self) -> Option<{{ api_type }}> {
+         if -1 == self as _ {
+            None
+        } else {
+            Some(self)
+        }
+    }
+}
+
+{% endwith %}
+{% endfor %}
+{% for struct in game.struct %}
+{% with type=struct.str_name|rust_api_output_type %}
+impl ToADT<{{ type }}> for {{ type }} {
+    fn to_adt(self) -> Option<{{ type }}> {
+        {% set separator = joiner('\n         && ') %}
+        if {% for field, _, _ in struct|numeric_fields %}{{ separator() }}self.{{ field }}.to_adt().is_none(){% endfor %} {
+            None
+        } else {
+            Some(self)
+        }
+    }
+}
+
+{% endwith %}
+{% endfor %}
+
 {%- for func in game.function %}
 
 {{ func.fct_summary|rust_comment(doc=True) }}
@@ -62,7 +98,11 @@ pub {{ func|rust_prototype }} {
         let {{ arg }} = UnsafeCell::new({{ arg }}.to_c());
         {% endif %}
         {% endfor %}
-        ffi::{{ func|rust_ffi_call }}.to_rust()
+        ffi::{{ func|rust_ffi_call }}
+            .to_rust()
+        {% if func|can_fail %}
+            .to_adt()
+        {% endif %}
     }
 }
 {% endfor %}
